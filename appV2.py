@@ -44,9 +44,10 @@ for uploaded_file in uploaded_files:  # pyright: ignore[]
 
     # Check if the file is predicted
     for result in list_result:
-        image_name = result['image_preview']
+        image_name = result['image_name']
         if image_name == uploaded_file.name:
             continue
+
     if uploaded_file.name.lower().endswith(("png", "jpg", "jpeg", "gif", "bmp")):
         result = return_result(uploaded_file, uploaded_file.name)
         show_result(result)
