@@ -22,15 +22,15 @@ class Args:
     num_mapping_layers = 3  # Số lớp của projection layer
     num_pre_output_layers = 3  # Số lớp của preoutput cnn
 
-    # clip_pretrained_model = "openai/clip-vit-large-patch14"  # model clip
+    clip_pretrained_model = "openai/clip-vit-large-patch14"  # model clip
 
-    # image_encoder = "openai/clip-vit-large-patch14"
-    # text_encoder = "FacebookAI/xlm-roberta-base"
+    image_encoder = "openai/clip-vit-large-patch14"
+    text_encoder = "FacebookAI/xlm-roberta-base"
 
-    clip_pretrained_model = "./archive/model.safetensors"  # model clip
+    # image_encoder = "/home/duckq1u/Documents/Projects/esti/Esti/archive/model.safetensors"  # model clip
 
-    image_encoder = "./archive/model.safetensors"
-    text_encoder = "./archive/xml_roberta.safetensors"
+    # image_encoder = "./archive/model.safetensors"
+    # text_encoder = "./archive/xml_roberta.safetensors"
 
     local_pretrained_weights = "none"
 
@@ -558,34 +558,39 @@ class CLIPClassifier(pl.LightningModule):
         return optimizer
 
 
-def detect_meme (image_model , text):
+model = CLIPClassifier.load_from_checkpoint("./archive/model-epoch13-val_loss0.00.ckpt", args=args,map_location= "cpu")
+device = torch.device("cpu")
+model = model.to(device)
 
-    image = Image.open(image_model).convert("RGB")
+image_processor = CLIPProcessor.from_pretrained(args.clip_pretrained_model)
+text_processor = CLIPTokenizer.from_pretrained(args.clip_pretrained_model)
 
-    device = torch.device("cpu")
+def detect_meme(image_model, text):
 
-    image_processor = CLIPProcessor.from_pretrained(args.clip_pretrained_model)
-    text_processor = CLIPTokenizer.from_pretrained(args.clip_pretrained_model)
+    # Load the image using PIL
+    image = Image.open(image_model)
 
     # Process the image
-    pixel_values = image_processor(images=image, return_tensors="pt")["pixel_values"].to(device)
+    pixel_values = image_processor(images=image, return_tensors="pt")['pixel_values'].to(device) # pyright: ignore[]
+    print("text preprocess", text)
 
     # Process the text
     text_output = text_processor(
-        text, padding=True, truncation=True, return_tensors="pt"
+        text['segment_text'],
+        padding=True,
+        truncation=True,
+        return_tensors="pt"
     ).to(device)
+
+    labels = torch.tensor(1, dtype=torch.float64, requires_grad=True)
 
     # Create the batch dictionary
     batch_new = {}
-    batch_new["pixel_values"] = pixel_values
-    batch_new["input_ids"] = text_output["input_ids"]
-    batch_new["attention_mask"] = text_output["attention_mask"]
+    batch_new['pixel_values'] = pixel_values
+    batch_new['input_ids'] = text_output['input_ids']
+    batch_new['attention_mask'] = text_output['attention_mask']
+    batch_new['labels'] = labels
 
-    model = CLIPClassifier.load_from_checkpoint(
-        "./archive/model-epoch13-val_loss0.00.ckpt",
-        args=args,
-        map_location="cpu",
-    )
-    encoder = model
-    embeddings = encoder(batch_new)
-    return {"violence": x for x in embeddings}
+    encoder = model(batch_new)
+    return {"detect_meme": encoder}
+
